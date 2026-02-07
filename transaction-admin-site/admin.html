@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Transaction Admin - Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Pending Transactions</h1>
+    <div id="user-info" class="muted"></div>
+    <div id="controls">
+      <button id="refresh-btn">Refresh</button>
+      <input id="tx-id-input" placeholder="Transaction ID" style="margin-left:8px;padding:6px;border-radius:6px;border:1px solid #ddd" />
+      <button id="confirm-tx-btn">Confirm TX</button>
+      <button id="promote-btn">Promote to Admin (dev)</button>
+      <button id="logout-btn">Logout</button>
+    </div>
+    <div id="tx-list">Loading...</div>
+    <div id="status" class="muted"></div>
+  </main>
+  <script>
+    // Permanently hard-set API base to the backend so the admin UI always calls the API.
+    // Change this value if you deploy the backend to a different host.
+    window.API_BASE = 'https://xapoloan.onrender.com';
+    window.API_URL = window.API_BASE;
+  </script>
+  <script src="script.js"></script>
+</body>
+</html>
