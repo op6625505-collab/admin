@@ -1,9 +1,9 @@
 // Resolve API base at runtime to avoid hardcoded localhost and allow deploys
 let API_BASE = window.API_BASE || window.API_URL || '';
 if (!API_BASE) {
-  // Since admin is served from the same backend, use relative paths
-  API_BASE = '';
-  console.warn('transaction-admin-site: using relative API paths');
+  // Default to backend URL on Render
+  API_BASE = 'https://backend-xapobank-1.onrender.com';
+  console.warn('transaction-admin-site: using default backend URL:', API_BASE);
 }
 API_BASE = API_BASE.replace(/\/$/, '');
 // Debug: expose resolved API base in console and footer for troubleshooting
@@ -51,7 +51,7 @@ if (document.getElementById('auth-form')) {
 
     try {
       if (isRegister) {
-        const res = await fetch('/api/auth/register', {
+        const res = await fetch(API_BASE + '/api/auth/register', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ name, email, password })
         });
@@ -62,7 +62,7 @@ if (document.getElementById('auth-form')) {
       }
 
       // login
-      const loginRes = await fetch('/api/auth/login', {
+      const loginRes = await fetch(API_BASE + '/api/auth/login', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ email, password })
       });
@@ -129,7 +129,7 @@ if (document.getElementById('tx-list')) {
     if (!confirm('Promote your account to admin? This is a dev helper.')) return;
     try {
       const token = localStorage.getItem('token') || '';
-      const res = await fetch('/api/dev/promote', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch(API_BASE + '/api/dev/promote', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
       const j = await res.json().catch(()=>({}));
       if (!res.ok) {
         statusEl.textContent = `Promote failed: ${res.status} ${j && j.message ? j.message : JSON.stringify(j)}`;
@@ -160,7 +160,7 @@ if (document.getElementById('tx-list')) {
       console.log('API_BASE:', API_BASE);
       
       // Fetch both pending and completed transactions - don't filter by status
-      const res = await fetch('/api/transactions', { headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch(API_BASE + '/api/transactions', { headers: { 'Authorization': 'Bearer ' + token } });
       console.log('Response status:', res.status);
       
       const j = await res.json().catch(()=>({}));
@@ -198,7 +198,7 @@ if (document.getElementById('tx-list')) {
     try {
       statusEl.textContent = 'Confirming ' + txId + '...';
       const token = localStorage.getItem('token') || '';
-      const res = await fetch('/api/admin/transactions/confirm', {
+      const res = await fetch(API_BASE + '/api/admin/transactions/confirm', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ transactionId: txId })
       });
@@ -248,7 +248,7 @@ if (document.getElementById('tx-list')) {
           if (!confirm('Mark transaction as Completed?')) return;
           try {
             const token = localStorage.getItem('token') || '';
-            const res = await fetch('/api/transactions/' + id + '/status', {
+            const res = await fetch(API_BASE + '/api/transactions/' + id + '/status', {
               method: 'PATCH', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + token },
               body: JSON.stringify({ status: 'Completed' })
             });
@@ -268,7 +268,7 @@ if (document.getElementById('tx-list')) {
             }
             statusEl.textContent = 'Transaction confirmed';
             // refresh user profile so balances update
-            try { await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } }).then(r=>r.json()).then(j=>{ if (j && j.data) localStorage.setItem('user', JSON.stringify(j.data)); }); } catch(e){}
+            try { await fetch(API_BASE + '/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } }).then(r=>r.json()).then(j=>{ if (j && j.data) localStorage.setItem('user', JSON.stringify(j.data)); }); } catch(e){}
           } catch (err) {
             statusEl.textContent = err.message || 'Error confirming';
             console.error(err);
