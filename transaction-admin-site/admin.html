@@ -12,12 +12,15 @@
     <div id="user-info" class="muted"></div>
     <div id="controls">
       <button id="refresh-btn">Refresh</button>
+      <button id="refresh-ids-btn" style="margin-left:8px">Pending IDs</button>
       <input id="tx-id-input" placeholder="Transaction ID" style="margin-left:8px;padding:6px;border-radius:6px;border:1px solid #ddd" />
       <button id="confirm-tx-btn">Confirm TX</button>
       <button id="promote-btn">Promote to Admin (dev)</button>
       <button id="logout-btn">Logout</button>
     </div>
     <div id="tx-list">Loading...</div>
+    <h2 style="margin-top:24px">Pending ID Verifications</h2>
+    <div id="id-list" class="muted">Click "Pending IDs" to load</div>
     <div id="status" class="muted"></div>
   </main>
   <script>
