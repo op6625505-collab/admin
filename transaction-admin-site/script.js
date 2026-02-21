@@ -68,6 +68,12 @@ if (document.getElementById('auth-form')) {
       });
       // Read raw text first so we can always inspect the body even if it's not JSON
       const raw = await loginRes.text().catch(()=>'<unreadable body>');
+      // Detect accidental server-source responses and abort early
+      if (raw && (raw.includes("const User = require('../models/User')") || raw.includes('exports.register') || raw.includes('module.exports'))) {
+        console.error('Login response appears to contain backend source code. Aborting. body=', raw.slice(0,200));
+        statusEl.textContent = 'Server returned unexpected response (backend source). Check backend.';
+        return;
+      }
       let loginJ = {};
       try {
         loginJ = raw ? JSON.parse(raw) : {};
@@ -104,6 +110,7 @@ if (document.getElementById('tx-list')) {
   const statusEl = qs('#status');
   const userInfoEl = qs('#user-info');
   const refreshBtn = qs('#refresh-btn');
+  const refreshIdsBtn = qs('#refresh-ids-btn');
   const promoteBtn = qs('#promote-btn');
   const confirmTxBtn = qs('#confirm-tx-btn');
   const txIdInput = qs('#tx-id-input');
@@ -122,6 +129,7 @@ if (document.getElementById('tx-list')) {
     window.location.href = 'index.html'; 
   });
   refreshBtn.addEventListener('click', loadTransactions);
+  if (refreshIdsBtn) refreshIdsBtn.addEventListener('click', loadPendingIds);
   if (promoteBtn) promoteBtn.addEventListener('click', promoteToAdmin);
     if (confirmTxBtn) confirmTxBtn.addEventListener('click', confirmTransactionById);
 
@@ -214,6 +222,72 @@ if (document.getElementById('tx-list')) {
       statusEl.textContent = e.message || 'Error confirming transaction';
       console.error(e);
     }
+  }
+
+  // --- Identity verification admin helpers ---
+  async function loadPendingIds() {
+    const idListEl = qs('#id-list');
+    idListEl.textContent = 'Loading...';
+    try {
+      const token = localStorage.getItem('token') || '';
+      const res = await fetch(API_BASE + '/api/admin/users/loan-pending', { headers: { 'Authorization': 'Bearer ' + token } });
+      const j = await res.json().catch(()=>({}));
+      if (!res.ok) {
+        idListEl.textContent = 'Failed to load pending IDs';
+        statusEl.textContent = JSON.stringify(j) || (j.message || 'Failed');
+        return;
+      }
+      const data = j.data || [];
+      renderIdList(data);
+      // scroll to the pending list and highlight so it's visible even if below long tx list
+      try {
+        idListEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const prevBg = idListEl.style.backgroundColor || '';
+        idListEl.style.backgroundColor = '#fff7cc';
+        setTimeout(() => { idListEl.style.transition = 'background-color 600ms ease'; idListEl.style.backgroundColor = prevBg; }, 800);
+      } catch (e) { /* ignore */ }
+    } catch (err) {
+      idListEl.textContent = 'Error loading pending IDs';
+      statusEl.textContent = err.message || 'Error';
+      console.error(err);
+    }
+  }
+
+  function renderIdList(list) {
+    const idListEl = qs('#id-list');
+    if (!list || list.length === 0) { idListEl.innerHTML = '<div class="card muted">No pending identity verifications</div>'; return; }
+    const isAdmin = (()=>{ try { const u = JSON.parse(localStorage.getItem('user')||'{}'); return u && String(u.role||'').toLowerCase()==='admin'; } catch(e){return false;} })();
+    idListEl.innerHTML = list.map(u => {
+      const id = u._id || u.id || '';
+      const uploadedAt = new Date(u.idUploadedAt||u.createdAt||Date.now()).toLocaleString();
+      const imgs = ['passportPath','nationalIdPath','driversLicensePath','livePhotoPath'].map(k => u[k] ? `<a href="${API_BASE + u[k]}" target="_blank"><img src="${API_BASE + u[k]}" style="max-width:120px;max-height:90px;margin:6px;border:1px solid #eee"/></a>` : '').join('');
+      const contact = `${u.name||''} ${u.email?'- '+u.email:''} ${u.phone?'- '+u.phone:''}`;
+      const controls = isAdmin ? `<div style="margin-top:8px"><button class="approve-id" data-id="${id}">Approve</button> <button class="reject-id" data-id="${id}">Reject</button></div>` : '<div class="muted">Admin only</div>';
+      return `<div class="card id-card" data-id="${id}"><div><strong>${contact}</strong></div><div>${uploadedAt}</div><div>${imgs}</div>${controls}</div>`;
+    }).join('');
+
+    // attach handlers
+    qsa('.approve-id').forEach(btn => btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id; if (!confirm('Approve identity verification for this user?')) return;
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch(API_BASE + '/api/admin/user/' + id + '/loan', { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ action: 'approve' }) });
+        const j = await res.json().catch(()=>({}));
+        if (!res.ok) { statusEl.textContent = `Approve failed: ${res.status}`; console.error('Approve failed', j); return; }
+        e.target.disabled = true; e.target.textContent = 'Approved';
+      } catch (err) { console.error(err); statusEl.textContent = err.message || 'Error'; }
+    }));
+
+    qsa('.reject-id').forEach(btn => btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id; if (!confirm('Reject identity verification for this user?')) return;
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch(API_BASE + '/api/admin/user/' + id + '/loan', { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ action: 'reject' }) });
+        const j = await res.json().catch(()=>({}));
+        if (!res.ok) { statusEl.textContent = `Reject failed: ${res.status}`; console.error('Reject failed', j); return; }
+        e.target.disabled = true; e.target.textContent = 'Rejected';
+      } catch (err) { console.error(err); statusEl.textContent = err.message || 'Error'; }
+    }));
   }
 
   function renderList(list, isAdmin) {
